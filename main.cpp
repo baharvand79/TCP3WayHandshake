@@ -1,39 +1,56 @@
+#include <QCoreApplication>
+#include <QThread>
 #include <iostream>
 #include "TCPHandshake.h"
-#include <thread>
-#include <chrono>
 
-int main() {
-    TCPHandshake handshake;
+int main(int argc, char *argv[]) {
+    QCoreApplication app(argc, argv);
 
-    // Start server
-    std::thread server_thread([&]() {
-        handshake.startServer("12345");
+    // Create server instance and move it to server thread
+    QThread serverThread;
+    TCPHandshake serverInstance;
+    serverInstance.moveToThread(&serverThread);
+    QObject::connect(&serverThread, &QThread::started, [&]() {
+        serverInstance.startServer("12345");
     });
+    serverThread.start();
 
     // Give the server time to start
-    std::this_thread::sleep_for(std::chrono::seconds(1));
+    QThread::sleep(1);
 
-    try {
-        std::vector<std::thread> client_threads;
-        for (int i = 0; i < 3; ++i) {
-            client_threads.emplace_back([&, i]() {
-                handshake.startClient("127.0.0.1", "12345", i);
-            });
-        }
+    // Create client instances and move each to its own client thread
+    std::vector<QThread*> clientThreads;
+    std::vector<TCPHandshake*> clientInstances;
+    for (int i = 0; i < 1; ++i) {
+        QThread* thread = new QThread();
+        clientThreads.push_back(thread);
+        TCPHandshake* clientInstance = new TCPHandshake();
+        clientInstances.push_back(clientInstance);
+        clientInstance->moveToThread(thread);
 
-        // Wait for all clients to finish
-        for (auto& thread : client_threads) {
-            thread.join();
-        }
+        // Connect to thread started signal to start client
+        QObject::connect(thread, &QThread::started, clientInstance, [&, i]() {
+            clientInstances[i]->startClient("127.0.0.1", "12345", i);
+        });
 
-        // Wait for the server to finish (in this example, it runs indefinitely)
-        server_thread.join();
-    } catch (const boost::system::system_error& e) {
-        std::cerr << "Boost system error: " << e.what() << std::endl;
-    } catch (const std::exception& e) {
-        std::cerr << "Exception: " << e.what() << std::endl;
+        // Start the thread
+        thread->start();
     }
 
-    return 0;
+    // Wait for all clients to finish
+    for (auto* thread : clientThreads) {
+        thread->wait(); // Wait for thread to finish
+        delete thread;  // Clean up thread object
+    }
+
+    // Quit and wait for the server thread to finish
+    serverThread.quit();
+    serverThread.wait();
+
+    // Clean up client instances
+    for (auto* clientInstance : clientInstances) {
+        delete clientInstance;
+    }
+
+    return app.exec();
 }

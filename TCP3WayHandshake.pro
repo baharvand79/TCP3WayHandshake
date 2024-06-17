@@ -1,4 +1,5 @@
-QT = core multimedia network
+QT += core multimedia network
+QT -= gui
 CONFIG += c++17 cmdline
 greaterThan(QT_MAJOR_VERSION, 5): QT += multimedia
 # You can make your code fail to compile if it uses deprecated APIs.

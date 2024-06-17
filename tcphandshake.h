@@ -1,7 +1,7 @@
 #ifndef TCP_HANDSHAKE_H
 #define TCP_HANDSHAKE_H
 
-#include <iostream>
+#include <QObject>
 #include <boost/asio.hpp>
 #include <cstdlib>
 #include <ctime>
@@ -9,11 +9,17 @@
 
 using boost::asio::ip::tcp;
 
-class TCPHandshake {
+class TCPHandshake : public QObject {
+    Q_OBJECT
+
 public:
     TCPHandshake();
     void startClient(const std::string& server_ip, const std::string& port, int client_id);
     void startServer(const std::string& port);
+
+signals:
+    void clientLog(const QString& log);
+    void serverLog(const QString& log);
 
 private:
     struct Packet {

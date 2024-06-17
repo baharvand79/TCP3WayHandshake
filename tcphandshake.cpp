@@ -1,4 +1,6 @@
 #include "TCPHandshake.h"
+#include <QDebug>
+#include <QThread>
 
 TCPHandshake::TCPHandshake() {
     std::srand(std::time(nullptr));
@@ -25,15 +27,15 @@ void TCPHandshake::clientSendSYN(tcp::socket& socket, Packet& clientPacket) {
     std::string syn_message = "SYN " + std::to_string(clientPacket.seqNumber);
     boost::asio::write(socket, boost::asio::buffer(syn_message));
 
-    std::cout << "Client(" << clientPacket.senderId << ") is sending SYN." << std::endl;
-    std::cout << "Client(" << clientPacket.senderId << ") -> Server: " << syn_message << std::endl;
+    emit clientLog(QString("Client(%1) is sending SYN.").arg(clientPacket.senderId));
+    emit clientLog(QString("Client(%1) -> Server: %2").arg(clientPacket.senderId).arg(QString::fromStdString(syn_message)));
 }
 
 void TCPHandshake::serverReceiveSYN(tcp::socket& socket, Packet& serverPacket) {
     char request[1024];
-    size_t request_length = boost::asio::read(socket, boost::asio::buffer(request, 1024));
+    size_t request_length = socket.read_some(boost::asio::buffer(request, 1024));
     std::string received(request, request_length);
-    std::cout << "Server received: " << received << std::endl;
+    qDebug() << "Server received: " << QString::fromStdString(received);
 
     if (received.substr(0, 3) == "SYN") {
         serverPacket.seqNumber = std::stoi(received.substr(4));
@@ -48,15 +50,15 @@ void TCPHandshake::serverSendSYNACK(tcp::socket& socket, Packet& serverPacket, P
     std::string syn_ack_message = "SYN-ACK " + std::to_string(serverPacket.seqNumber) + " " + std::to_string(serverPacket.ackNumber);
     boost::asio::write(socket, boost::asio::buffer(syn_ack_message));
 
-    std::cout << "Server is sending SYN-ACK." << std::endl;
-    std::cout << "Server -> Client(" << clientPacket.senderId << "): " << syn_ack_message << std::endl;
+    emit serverLog(QString("Server is sending SYN-ACK."));
+    emit serverLog(QString("Server -> Client(%1): %2").arg(clientPacket.senderId).arg(QString::fromStdString(syn_ack_message)));
 }
 
 void TCPHandshake::clientReceiveSYNACK(tcp::socket& socket, Packet& clientPacket) {
     char reply[1024];
-    size_t reply_length = boost::asio::read(socket, boost::asio::buffer(reply, 1024));
+    size_t reply_length = socket.read_some(boost::asio::buffer(reply, 1024));
     std::string received(reply, reply_length);
-    std::cout << "Client(" << clientPacket.senderId << ") received: " << received << std::endl;
+    qDebug() << "Client(" << clientPacket.senderId << ") received: " << QString::fromStdString(received);
 
     if (received.substr(0, 7) == "SYN-ACK") {
         size_t first_space = received.find(' ', 8);
@@ -71,56 +73,58 @@ void TCPHandshake::clientSendACK(tcp::socket& socket, Packet& clientPacket) {
     std::string ack_message = "ACK " + std::to_string(clientPacket.ackNumber);
     boost::asio::write(socket, boost::asio::buffer(ack_message));
 
-    std::cout << "Client is sending ACK." << std::endl;
-    std::cout << "Client(" << clientPacket.senderId << ") -> Server: " << ack_message << std::endl;
+    emit clientLog(QString("Client is sending ACK."));
+    emit clientLog(QString("Client(%1) -> Server: %2").arg(clientPacket.senderId).arg(QString::fromStdString(ack_message)));
 }
 
 void TCPHandshake::serverReceiveACK(tcp::socket& socket, Packet& serverPacket, Packet& clientPacket) {
     char request[1024];
-    size_t request_length = boost::asio::read(socket, boost::asio::buffer(request, 1024));
+    size_t request_length = socket.read_some(boost::asio::buffer(request, 1024));
     std::string received(request, request_length);
-    std::cout << "Server received: " << received << std::endl;
+    qDebug() << "Server received: " << QString::fromStdString(received);
 
     if (received.substr(0, 3) == "ACK") {
         serverPacket.ackNumber = std::stoi(received.substr(4));
     }
 
-    std::cout << "Server received ACK from Client(" << clientPacket.senderId << ")." << std::endl;
-    std::cout << "Connection Established for client(" << clientPacket.senderId << ")." << std::endl;
+    qDebug() << "Server received ACK from Client(" << clientPacket.senderId << ").";
+    qDebug() << "Connection Established for client(" << clientPacket.senderId << ").";
 }
 
 void TCPHandshake::clientCloseConnection(tcp::socket& socket, Packet& clientPacket) {
     clientPacket.fin = true;
     std::string fin_message = "FIN " + std::to_string(clientPacket.seqNumber);
     boost::asio::write(socket, boost::asio::buffer(fin_message));
-    std::cout << "Client(" << clientPacket.senderId << ") closes connection." << std::endl;
-    std::cout << "Client(" << clientPacket.senderId << ") -> Server: " << fin_message << std::endl;
+
+    emit clientLog(QString("Client(%1) closes connection.").arg(clientPacket.senderId));
+    emit clientLog(QString("Client(%1) -> Server: %2").arg(clientPacket.senderId).arg(QString::fromStdString(fin_message)));
 }
 
 void TCPHandshake::serverCloseConnection(tcp::socket& socket, Packet& serverPacket) {
     char request[1024];
-    size_t request_length = boost::asio::read(socket, boost::asio::buffer(request, 1024));
+    size_t request_length = socket.read_some(boost::asio::buffer(request, 1024));
     std::string received(request, request_length);
-    std::cout << "Server received: " << received << std::endl;
+    qDebug() << "Server received: " << QString::fromStdString(received);
 
     if (received.substr(0, 3) == "FIN") {
         std::string fin_ack_message = "FIN-ACK " + std::to_string(serverPacket.seqNumber);
         boost::asio::write(socket, boost::asio::buffer(fin_ack_message));
-        std::cout << "Server -> Client(" << serverPacket.senderId << "): " << fin_ack_message << std::endl;
+
+        qDebug() << "Server -> Client(" << serverPacket.senderId << "): " << QString::fromStdString(fin_ack_message);
 
         // Wait for the final ACK from the client
-        request_length = boost::asio::read(socket, boost::asio::buffer(request, 1024));
-        std::cout << "Server received: " << std::string(request, request_length) << std::endl;
+        request_length = socket.read_some(boost::asio::buffer(request, 1024));
+        qDebug() << "Server received: " << QString::fromStdString(std::string(request, request_length));
 
         if (std::string(request, request_length).substr(0, 3) == "ACK") {
-            std::cout << "Connection Closed" << std::endl;
+            qDebug() << "Connection Closed";
         }
     }
 }
 
 void TCPHandshake::startClient(const std::string& server_ip, const std::string& port, int client_id) {
     try {
-        std::cout << "Client(" << client_id <<") is starting." << std::endl;
+        qDebug() << "Client(" << client_id <<") is starting.";
         boost::asio::io_context io_context;
         tcp::resolver resolver(io_context);
         auto endpoints = resolver.resolve(server_ip, port);
@@ -134,34 +138,42 @@ void TCPHandshake::startClient(const std::string& server_ip, const std::string& 
         clientSendACK(socket, clientPacket);
         clientCloseConnection(socket, clientPacket);
     } catch (const boost::system::system_error& e) {
-        std::cerr << "Boost system error: " << e.what() << std::endl;
+        qWarning() << "Boost system error: " << e.what();
     } catch (const std::exception& e) {
-        std::cerr << "Exception: " << e.what() << std::endl;
+        qWarning() << "Exception: " << e.what();
     }
 }
 
 void TCPHandshake::startServer(const std::string& port) {
-    try {
-        std::cout << "Server is starting." << std::endl;
-        std::cout << "----------------------------------\n";
-        boost::asio::io_context io_context;
-        tcp::acceptor acceptor(io_context, tcp::endpoint(tcp::v4(), std::stoi(port)));
+    QThread* thread = new QThread();
+    moveToThread(thread);
 
-        for (;;) {
-            tcp::socket socket(io_context);
-            acceptor.accept(socket);
+    connect(thread, &QThread::started, this, [=]() {
+        try {
+            qDebug() << "Server is starting.";
+            qDebug() << "----------------------------------";
+            boost::asio::io_context io_context;
+            tcp::acceptor acceptor(io_context, tcp::endpoint(tcp::v4(), std::stoi(port)));
 
-            Packet serverPacket = generateInitialPacket(0);
+            for (;;) {
+                tcp::socket socket(io_context);
+                acceptor.accept(socket);
 
-            serverReceiveSYN(socket, serverPacket);
-            Packet clientPacket; // Temporary client packet for server state
-            serverSendSYNACK(socket, serverPacket, clientPacket);
-            serverReceiveACK(socket, serverPacket, clientPacket);
-            serverCloseConnection(socket, serverPacket);
+                Packet serverPacket = generateInitialPacket(0);
+
+                serverReceiveSYN(socket, serverPacket);
+                Packet clientPacket; // Temporary client packet for server state
+                serverSendSYNACK(socket, serverPacket, clientPacket);
+                serverReceiveACK(socket, serverPacket, clientPacket);
+                serverCloseConnection(socket, serverPacket);
+            }
+        } catch (const boost::system::system_error& e) {
+            qWarning() << "Boost system error: " << e.what();
+        } catch (const std::exception& e) {
+            qWarning() << "Exception: " << e.what();
         }
-    } catch (const boost::system::system_error& e) {
-        std::cerr << "Boost system error: " << e.what() << std::endl;
-    } catch (const std::exception& e) {
-        std::cerr << "Exception: " << e.what() << std::endl;
-    }
+    });
+
+    connect(thread, &QThread::finished, thread, &QThread::deleteLater);
+    thread->start();
 }
