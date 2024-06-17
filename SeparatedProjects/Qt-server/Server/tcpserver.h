@@ -2,6 +2,8 @@
 #define TCPSERVER_H
 
 #include <QTcpServer>
+#include <QTcpSocket>
+#include <QDataStream>
 
 class TcpServer : public QTcpServer
 {
@@ -14,10 +16,14 @@ protected:
     void incomingConnection(qintptr socketDescriptor) override;
 
 private slots:
-    void readData();
+    void readyRead();
+    void processMessage(QTcpSocket *clientSocket, const QByteArray &message);
 
 private:
-    QList<QTcpSocket *> clients;
+    void sendAck(QTcpSocket *clientSocket);
+
+private:
+    QMap<QTcpSocket*, qint32> expectedSequenceNumber;
 };
 
 #endif // TCPSERVER_H
