@@ -3,24 +3,23 @@
 
 #include <QObject>
 #include <QTcpSocket>
-#include <QRandomGenerator>
 
 class TcpClient : public QObject
 {
     Q_OBJECT
-
 public:
     explicit TcpClient(QObject *parent = nullptr);
 
 public slots:
     void connectToServer();
+    void sendData(const QString &message); // New method to send data
 
 private slots:
+    void sendSyn();
     void connected();
     void disconnected();
     void readyRead();
     void sendAck();
-    void sendSyn();
 
 private:
     QTcpSocket *socket;

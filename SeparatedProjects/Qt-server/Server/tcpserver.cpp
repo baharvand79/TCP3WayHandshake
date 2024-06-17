@@ -27,8 +27,6 @@ void TcpServer::incomingConnection(qintptr socketDescriptor)
     serverSequenceNumbers.insert(clientSocket, 0);
 
     connect(clientSocket, &QTcpSocket::readyRead, this, &TcpServer::readyRead);
-
-    // No SYN-ACK sent immediately upon connection
 }
 
 void TcpServer::readyRead()
@@ -45,6 +43,7 @@ void TcpServer::readyRead()
         quint32 sequenceNumber;
         quint16 maxSegmentSize;
         quint16 windowSize;
+        QByteArray data;
 
         in >> flags >> sequenceNumber >> maxSegmentSize >> windowSize;
 
@@ -61,11 +60,19 @@ void TcpServer::readyRead()
 
             flags = 0b00000011; // Set SYN and ACK flags
             quint32 serverSequenceNumber = QRandomGenerator::global()->generate();
+            serverSequenceNumbers[clientSocket] = serverSequenceNumber;
             out << flags << serverSequenceNumber << maxSegmentSize << windowSize;
 
             // Now we wait for ACK from client to complete the handshake
-        } else if(flags & 0b00000010) {
-            qDebug() << "Recieved ACK from client";
+        } else if (flags & 0b00000010) { // Check if ACK flag is set
+            qDebug() << "Received ACK from client";
+            // Connection is established, server can start processing data if needed
+            qDebug() << "Connection established";
+        } else {
+            // Handle data segments
+            qDebug() << "Received data from client";
+            in >> data;
+            qDebug() << "Data:" << QString::fromUtf8(data);
         }
     }
 }

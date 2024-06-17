@@ -57,14 +57,25 @@ void TcpClient::readyRead()
         quint32 sequenceNumber;
         quint16 maxSegmentSize;
         quint16 windowSize;
+        QByteArray data;
 
         in >> flags >> sequenceNumber >> maxSegmentSize >> windowSize;
 
-        if (flags & 0b00000011) { // Check if ACK flag is set
+        if (flags & 0b00000011) { // Check if SYN-ACK flag is set
             qDebug() << "Received SYN-ACK from server";
-            // Connection established, start sending data if needed
-            // Example: sendData();
+            serverSequenceNumber = sequenceNumber;
+
+            // Send ACK to server to complete the handshake
             sendAck();
+        } else if (flags & 0b00000010) { // Check if ACK flag is set
+            qDebug() << "Received ACK from server";
+            // Now connection is established and we can send data
+            sendData("Hello from client!");
+        } else {
+            // Handle data segments
+            qDebug() << "Received data from server";
+            in >> data;
+            qDebug() << "Data:" << QString::fromUtf8(data);
         }
     }
 }
@@ -78,6 +89,20 @@ void TcpClient::sendAck()
     quint8 flags = 0b00000010; // Set ACK flag
 
     // ACK acknowledges the SYN-ACK received from server
-    out << flags << serverSequenceNumber + 1;
+    out << flags << (serverSequenceNumber + 1) << quint16(0) << quint16(0); // Add dummy values for maxSegmentSize and windowSize
+
+    // Now that ACK is sent, connection should be considered established
+    // Example: After ACK, client can start sending data
+    sendData("Hello from client!");
 }
 
+void TcpClient::sendData(const QString &message)
+{
+    qDebug() << "Sending data to server:" << message;
+    QDataStream out(socket);
+    out.setVersion(QDataStream::Qt_5_15);
+
+    quint8 flags = 0; // No special flags for data segment
+
+    out << flags << clientSequenceNumber << quint16(0) << quint16(0) << message.toUtf8();
+}
