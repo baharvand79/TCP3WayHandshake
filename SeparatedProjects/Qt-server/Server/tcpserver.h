@@ -3,7 +3,7 @@
 
 #include <QTcpServer>
 #include <QTcpSocket>
-#include <QDataStream>
+#include <QMap>
 
 class TcpServer : public QTcpServer
 {
@@ -17,13 +17,10 @@ protected:
 
 private slots:
     void readyRead();
-    void processMessage(QTcpSocket *clientSocket, const QByteArray &message);
 
 private:
-    void sendAck(QTcpSocket *clientSocket);
-
-private:
-    QMap<QTcpSocket*, qint32> expectedSequenceNumber;
+    QMap<QTcpSocket*, quint32> clientSequenceNumbers;
+    QMap<QTcpSocket*, quint32> serverSequenceNumbers;
 };
 
 #endif // TCPSERVER_H

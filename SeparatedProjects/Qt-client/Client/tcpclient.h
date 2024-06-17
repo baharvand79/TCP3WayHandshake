@@ -3,6 +3,7 @@
 
 #include <QObject>
 #include <QTcpSocket>
+#include <QRandomGenerator>
 
 class TcpClient : public QObject
 {
@@ -18,10 +19,13 @@ private slots:
     void connected();
     void disconnected();
     void readyRead();
-    void sendMessage(const QString &message);
+    void sendAck();
+    void sendSyn();
 
 private:
     QTcpSocket *socket;
+    quint32 clientSequenceNumber;
+    quint32 serverSequenceNumber;
 };
 
 #endif // TCPCLIENT_H

@@ -1,15 +1,15 @@
 #include "tcpserver.h"
-#include <QTcpSocket>
 #include <QDebug>
+#include <QDataStream>
+#include <QRandomGenerator>
 
 TcpServer::TcpServer(QObject *parent)
     : QTcpServer(parent)
 {
-    // Start listening on all available network interfaces and port 1234
-    if (!listen(QHostAddress::LocalHost, 1234)) {
-        qDebug() << "Error: Unable to start server.";
+    if (!listen(QHostAddress::Any, 1234)) {
+        qCritical() << "Unable to start the server:" << errorString();
     } else {
-        qDebug() << "Server started. Listening on port 1234.";
+        qDebug() << "Server started. Listening on port" << serverPort();
     }
 }
 
@@ -17,36 +17,55 @@ void TcpServer::incomingConnection(qintptr socketDescriptor)
 {
     qDebug() << "Incoming connection";
 
-    // Create a new socket for the incoming connection
     QTcpSocket *clientSocket = new QTcpSocket(this);
-
-    // Set up the socket with the incoming socket descriptor
     if (!clientSocket->setSocketDescriptor(socketDescriptor)) {
-        qDebug() << "Error setting socket descriptor";
+        qWarning() << "Error setting socket descriptor";
         return;
     }
 
-    // Connect signals/slots for communication
-    connect(clientSocket, &QTcpSocket::readyRead, this, &TcpServer::readData);
-    connect(clientSocket, &QTcpSocket::disconnected, clientSocket, &QTcpSocket::deleteLater);
+    clientSequenceNumbers.insert(clientSocket, 0);
+    serverSequenceNumbers.insert(clientSocket, 0);
 
-    // Add the client socket to the list
-    clients.append(clientSocket);
+    connect(clientSocket, &QTcpSocket::readyRead, this, &TcpServer::readyRead);
+
+    // No SYN-ACK sent immediately upon connection
 }
 
-void TcpServer::readData()
+void TcpServer::readyRead()
 {
-    QTcpSocket *socket = qobject_cast<QTcpSocket*>(sender());
-    if (!socket)
+    QTcpSocket *clientSocket = qobject_cast<QTcpSocket*>(sender());
+    if (!clientSocket)
         return;
 
-    QByteArray data = socket->readAll();
-    qDebug() << "Data from client:" << data;
+    QDataStream in(clientSocket);
+    in.setVersion(QDataStream::Qt_5_15);
 
-    // Example of broadcasting data to all connected clients
-    for (QTcpSocket *client : clients) {
-        if (client != socket) {
-            client->write(data);
+    while (!in.atEnd()) {
+        quint8 flags;
+        quint32 sequenceNumber;
+        quint16 maxSegmentSize;
+        quint16 windowSize;
+
+        in >> flags >> sequenceNumber >> maxSegmentSize >> windowSize;
+
+        if (flags & 0b00000001) { // Check if SYN flag is set
+            qDebug() << "Received SYN from client";
+
+            clientSequenceNumbers[clientSocket] = sequenceNumber;
+            qDebug() << "Client Sequence Number:" << sequenceNumber;
+
+            // Send SYN-ACK in response to client's SYN
+            qDebug() << "Sending SYN-ACK to client";
+            QDataStream out(clientSocket);
+            out.setVersion(QDataStream::Qt_5_15);
+
+            flags = 0b00000011; // Set SYN and ACK flags
+            quint32 serverSequenceNumber = QRandomGenerator::global()->generate();
+            out << flags << serverSequenceNumber << maxSegmentSize << windowSize;
+
+            // Now we wait for ACK from client to complete the handshake
+        } else if(flags & 0b00000010) {
+            qDebug() << "Recieved ACK from client";
         }
     }
 }
