@@ -1,43 +1,42 @@
-#ifndef TCPHANDSHAKE_HPP
-#define TCPHANDSHAKE_HPP
+#ifndef TCP_HANDSHAKE_H
+#define TCP_HANDSHAKE_H
 
 #include <iostream>
 #include <boost/asio.hpp>
-#include <ctime>
 #include <cstdlib>
+#include <ctime>
+#include <string>
 
 using boost::asio::ip::tcp;
 
 class TCPHandshake {
 public:
     TCPHandshake();
-
-    void startClient(const std::string& server_ip, const std::string& port);
+    void startClient(const std::string& server_ip, const std::string& port, int client_id);
     void startServer(const std::string& port);
 
 private:
     struct Packet {
+        int seqNumber;
+        int ackNumber;
         bool syn;
         bool ack;
         bool fin;
-        int seqNumber;
-        int ackNumber;
         int mss;
         int windowSize;
+        int senderId;
     };
 
-    Packet clientPacket;
-    Packet serverPacket;
+    Packet generateInitialPacket(int client_id);
 
-    void generateInitialSequenceNumbers();
-    void clientSendSYN(tcp::socket& socket);
-    void serverReceiveSYN(tcp::socket& socket);
-    void serverSendSYNACK(tcp::socket& socket);
-    void clientReceiveSYNACK(tcp::socket& socket);
-    void clientSendACK(tcp::socket& socket);
-    void serverReceiveACK(tcp::socket& socket);
-    void clientCloseConnection(tcp::socket& socket);
-    void serverCloseConnection(tcp::socket& socket);
+    void clientSendSYN(tcp::socket& socket, Packet& clientPacket);
+    void serverReceiveSYN(tcp::socket& socket, Packet& serverPacket);
+    void serverSendSYNACK(tcp::socket& socket, Packet& serverPacket, Packet& clientPacket);
+    void clientReceiveSYNACK(tcp::socket& socket, Packet& clientPacket);
+    void clientSendACK(tcp::socket& socket, Packet& clientPacket);
+    void serverReceiveACK(tcp::socket& socket, Packet& serverPacket, Packet& clientPacket);
+    void clientCloseConnection(tcp::socket& socket, Packet& clientPacket);
+    void serverCloseConnection(tcp::socket& socket, Packet& serverPacket);
 };
 
-#endif // TCPHANDSHAKE_HPP
+#endif // TCP_HANDSHAKE_H
