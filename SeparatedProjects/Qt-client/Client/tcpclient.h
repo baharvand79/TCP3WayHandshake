@@ -3,32 +3,39 @@
 
 #include <QObject>
 #include <QTcpSocket>
+#include <QThread>
 #include <QCryptographicHash>
-
 class TcpClient : public QObject
 {
     Q_OBJECT
 public:
     explicit TcpClient(QObject *parent = nullptr);
+    void connectToServer();
 
 public slots:
-    void connectToServer();
-    void sendData(const QString &message);
-    void sendSegment(const QByteArray &segment);
-    // void sendAckForData(quint32 sequenceNumber);
-
-private slots:
-    void sendSyn();
     void connected();
     void disconnected();
     void readyRead();
     void sendAck();
-    //void readyReadData();
+    void sendData(const QString &message);
+    void sendSegment(const QByteArray &segment);
 
 private:
     QTcpSocket *socket;
     quint32 clientSequenceNumber;
     quint32 serverSequenceNumber;
+    void sendSyn();
+};
+
+class ClientThread : public QThread
+{
+    Q_OBJECT
+public:
+    explicit ClientThread(QObject *parent = nullptr);
+    void run() override;
+
+private:
+    TcpClient *client;
 };
 
 #endif // TCPCLIENT_H

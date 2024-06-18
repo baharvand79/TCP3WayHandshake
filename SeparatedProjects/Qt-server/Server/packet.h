@@ -4,7 +4,6 @@
 #include <QByteArray>
 #include <QDataStream>
 #include <QIODevice>
-
 struct Packet {
     quint8 flags;
     quint32 sequenceNumber;
