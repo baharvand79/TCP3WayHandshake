@@ -59,9 +59,6 @@
 //         } else if (receivedPacket.flags == 0b11111100) {
 //             qDebug() << "Received ACK from server";
 //             qDebug() << "Connection is established.";
-//             QString message = "Hello Server!";
-//             qDebug() << "Data is: " << message;
-//             sendData(message);
 //         } else if (receivedPacket.flags == 0b11111110) {
 //             qDebug() << "Received ACK from server for segment with sequence number" << receivedPacket.sequenceNumber;
 //         }
@@ -102,18 +99,6 @@
 //     socket->write(dataPacket.serialize());
 // }
 
-// ClientThread::ClientThread(QObject *parent)
-//     : QThread(parent), client(new TcpClient())
-// {
-//     client->moveToThread(this);
-// }
-
-// void ClientThread::run()
-// {
-//     client->connectToServer();
-//     exec();
-// }
-
 #include "tcpclient.h"
 #include "packet.h"
 
@@ -123,11 +108,12 @@
 
 TcpClient::TcpClient(QObject *parent)
     : QObject(parent), socket(new QTcpSocket(this)),
-    clientSequenceNumber(0), serverSequenceNumber(0)
+    clientSequenceNumber(0), serverSequenceNumber(0), messageCount(0)
 {
     connect(socket, &QTcpSocket::connected, this, &TcpClient::connected);
     connect(socket, &QTcpSocket::disconnected, this, &TcpClient::disconnected);
     connect(socket, &QTcpSocket::readyRead, this, &TcpClient::readyRead);
+    connect(&timer, &QTimer::timeout, this, &TcpClient::sendPeriodicMessages);
 }
 
 void TcpClient::connectToServer()
@@ -175,6 +161,7 @@ void TcpClient::readyRead()
         } else if (receivedPacket.flags == 0b11111100) {
             qDebug() << "Received ACK from server";
             qDebug() << "Connection is established.";
+            timer.start(5000); // Start sending messages every 5 seconds
         } else if (receivedPacket.flags == 0b11111110) {
             qDebug() << "Received ACK from server for segment with sequence number" << receivedPacket.sequenceNumber;
         }
@@ -213,4 +200,16 @@ void TcpClient::sendSegment(const QByteArray &segment)
     QByteArray checksum = QCryptographicHash::hash(segment, QCryptographicHash::Md5);
     Packet dataPacket(flags, clientSequenceNumber, 0, 0, segment, checksum);
     socket->write(dataPacket.serialize());
+}
+
+void TcpClient::sendPeriodicMessages()
+{
+    if (messageCount < 2) {
+        sendData("Hello Server!");
+        messageCount++;
+    } else {
+        sendData("This is a long message that should be split into segments. This is a long message that should be split into segments. This is a long message that should be split into segments. This is a long message that should be split into segments.");
+        timer.stop();
+        QTimer::singleShot(5000, socket, &QTcpSocket::disconnectFromHost);
+    }
 }
