@@ -3,6 +3,7 @@
 
 #include <QObject>
 #include <QTcpSocket>
+#include <QCryptographicHash>
 
 class TcpClient : public QObject
 {
@@ -22,7 +23,7 @@ private slots:
     void disconnected();
     void readyRead();
     void sendAck();
-    void readyReadData();
+    //void readyReadData();
 
 private:
     QTcpSocket *socket;

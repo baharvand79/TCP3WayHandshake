@@ -1,103 +1,3 @@
-// #include "tcpserver.h"
-// #include <QDebug>
-// #include <QDataStream>
-// #include <QRandomGenerator>
-
-// TcpServer::TcpServer(QObject *parent)
-//     : QTcpServer(parent)
-// {
-//     if (!listen(QHostAddress::Any, 1234)) {
-//         qCritical() << "Unable to start the server:" << errorString();
-//     } else {
-//         qDebug() << "Server started. Listening on port" << serverPort();
-//     }
-// }
-
-// void TcpServer::incomingConnection(qintptr socketDescriptor)
-// {
-//     qDebug() << "Incoming connection";
-
-//     QTcpSocket *clientSocket = new QTcpSocket(this);
-//     if (!clientSocket->setSocketDescriptor(socketDescriptor)) {
-//         qWarning() << "Error setting socket descriptor";
-//         return;
-//     }
-
-//     clientSequenceNumbers.insert(clientSocket, 0);
-//     serverSequenceNumbers.insert(clientSocket, 0);
-
-//     connect(clientSocket, &QTcpSocket::readyRead, this, &TcpServer::readyRead);
-// }
-
-// void TcpServer::readyRead()
-// {
-//     QTcpSocket *clientSocket = qobject_cast<QTcpSocket*>(sender());
-//     if (!clientSocket)
-//         return;
-
-//     QDataStream in(clientSocket);
-//     in.setVersion(QDataStream::Qt_5_15);
-
-//     while (!in.atEnd()) {
-//         quint8 flags;
-//         quint32 sequenceNumber;
-//         quint16 maxSegmentSize;
-//         quint16 windowSize;
-//         QByteArray data;
-
-//         in >> flags >> sequenceNumber >> maxSegmentSize >> windowSize;
-
-//         if (flags & 0b00000001) { // Check if SYN flag is set
-//             qDebug() << "Received SYN from client";
-
-//             clientSequenceNumbers[clientSocket] = sequenceNumber;
-//             qDebug() << "Client Sequence Number:" << sequenceNumber;
-
-//             // Send SYN-ACK in response to client's SYN
-//             qDebug() << "Sending SYN-ACK to client";
-//             QDataStream out(clientSocket);
-//             out.setVersion(QDataStream::Qt_5_15);
-
-//             flags = 0b00000011; // Set SYN and ACK flags
-//             quint32 serverSequenceNumber = QRandomGenerator::global()->generate();
-//             serverSequenceNumbers[clientSocket] = serverSequenceNumber;
-//             out << flags << serverSequenceNumber << maxSegmentSize << windowSize;
-
-//             // Now we wait for ACK from client to complete the handshake
-//         } else if (flags & 0b00000010) { // Check if ACK flag is set
-//             qDebug() << "Received ACK from client";
-//             // Connection is established, server can start processing data if needed
-//             qDebug() << "Connection established";
-
-//             QDataStream out(clientSocket);
-//             out.setVersion(QDataStream::Qt_5_15);
-
-//             flags = 0b11111100; // Set SYN and ACK flags
-
-//             out << flags << sequenceNumber << maxSegmentSize << windowSize;
-
-//         } else { // Handle data segments
-//             qDebug() << "Received data from client";
-//             in >> data;
-//             qDebug() << "Data:" << QString::fromUtf8(data);
-
-//             // Send acknowledgment for the data packet
-//             //sendAckForData(clientSocket, sequenceNumber);
-//         }
-//     }
-// }
-
-// void TcpServer::sendAckForData(QTcpSocket *clientSocket, quint32 sequenceNumber)
-// {
-//     qDebug() << "Sending ACK for data packet";
-//     QDataStream out(clientSocket);
-//     out.setVersion(QDataStream::Qt_5_15);
-
-//     quint8 flags = 0b00000010; // Set ACK flag
-
-//     // ACK acknowledges the data packet received from client
-//     out << flags << sequenceNumber << quint16(0) << quint16(0); // Add dummy values for maxSegmentSize and windowSize
-// }
 #include "tcpserver.h"
 #include "packet.h" // Include the Packet structure
 
@@ -141,28 +41,42 @@ void TcpServer::readyRead()
         QByteArray receivedData = clientSocket->readAll();
         Packet receivedPacket = Packet::deserialize(receivedData);
 
-        if (receivedPacket.flags & 0b00000001) { // Check if SYN flag is set
+        if (receivedPacket.flags & 0b00000001) { // SYN packet
             qDebug() << "Received SYN from client";
 
-            clientSequenceNumbers[clientSocket] = receivedPacket.sequenceNumber;
-            qDebug() << "Client Sequence Number:" << receivedPacket.sequenceNumber;
+            // Process initial SYN (if necessary), not shown in the original code
 
-            // Send SYN-ACK in response to client's SYN
+            // Respond with SYN-ACK
             sendSynAck(clientSocket);
-        } else if (receivedPacket.flags & 0b00000010) { // Check if ACK flag is set
+        } else if (receivedPacket.flags & 0b00000010) { // ACK packet
             qDebug() << "Received ACK from client";
-            // Connection is established, server can start processing data if needed
-            qDebug() << "Connection established";
 
+            // Process ACK for connection establishment
             sendAckForEstablishment(clientSocket, receivedPacket.sequenceNumber);
+            // At this point, connection is established, you may start processing data
+            // or further communications depending on your application logic.
+            // Example: Start processing data if needed
 
-            // Handle ACK for SYN or data
-        } else { // Handle data segments
-            qDebug() << "Received data from client";
-            qDebug() << "Data:" << QString::fromUtf8(receivedPacket.data);
+        } else if (receivedPacket.flags & 0b11111100) { // Data packet
+            qDebug() << "Received data from client with sequence number" << receivedPacket.sequenceNumber;
 
-            // Send acknowledgment for the data packet
-            //sendAckForData(clientSocket, receivedPacket.sequenceNumber);
+            // Validate the packet (sequence number, checksum, etc.)
+            if (validatePacket(receivedPacket)) {
+                // Process the data
+                qDebug() << "Data:" << QString::fromUtf8(receivedPacket.data);
+
+                // Example: Acknowledge the data packet
+                sendAckForData(clientSocket, receivedPacket.sequenceNumber);
+            } else {
+                qDebug() << "Invalid packet received, ignoring.";
+                // Handle invalid packet scenario if needed
+            }
+        } else if (receivedPacket.flags & 0b11111110) { // Data ACK packet
+            qDebug() << "Received ACK for data segment with sequence number" << receivedPacket.sequenceNumber;
+
+            // Process acknowledgment for the data segment (if needed)
+        } else {
+            qDebug() << "Unknown packet received, ignoring."; // Handle unknown packets
         }
     }
 }
@@ -179,6 +93,14 @@ void TcpServer::sendSynAck(QTcpSocket *clientSocket)
     clientSocket->write(synAckPacket.serialize());
 }
 
+void TcpServer::sendAckForData(QTcpSocket *clientSocket, quint32 sequenceNumber)
+{
+    qDebug() << "Sending ACK for data segment with sequence number" << sequenceNumber;
+    quint8 flags = 0b11111110; // Set ACK flag
+
+    Packet ackPacket(flags, sequenceNumber, 0, 0); // dummy maxSegmentSize and windowSize
+    clientSocket->write(ackPacket.serialize());
+}
 void TcpServer::sendAckForEstablishment(QTcpSocket *clientSocket, quint32 sequenceNumber)
 {
     qDebug() << "Sending ACK for data packet";
@@ -186,4 +108,16 @@ void TcpServer::sendAckForEstablishment(QTcpSocket *clientSocket, quint32 sequen
 
     Packet ackPacket(flags, sequenceNumber, 0, 0); // dummy maxSegmentSize and windowSize
     clientSocket->write(ackPacket.serialize());
+}
+QByteArray TcpServer::generateChecksum(const QByteArray &data)
+{
+    return QCryptographicHash::hash(data, QCryptographicHash::Md5);
+}
+bool TcpServer::validatePacket(const Packet &packet)
+{
+    QByteArray newChecksum = generateChecksum(packet.data);
+    if (newChecksum == packet.checksum){
+        return true;
+    }
+    return false;
 }
