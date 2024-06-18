@@ -12,11 +12,14 @@ class TcpServer : public QTcpServer
 public:
     TcpServer(QObject *parent = nullptr);
 
+
 protected:
     void incomingConnection(qintptr socketDescriptor) override;
 
 private slots:
     void readyRead();
+    void sendAck(QTcpSocket *clientSocket, quint32 sequenceNumber);
+    void sendAckForData(QTcpSocket *clientSocket, quint32 sequenceNumber);
 
 private:
     QMap<QTcpSocket*, quint32> clientSequenceNumbers;

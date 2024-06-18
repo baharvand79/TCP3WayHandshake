@@ -12,7 +12,9 @@ public:
 
 public slots:
     void connectToServer();
-    void sendData(const QString &message); // New method to send data
+    void sendData(const QString &message);
+    void sendSegment(const QByteArray &segment);
+    // void sendAckForData(quint32 sequenceNumber);
 
 private slots:
     void sendSyn();
@@ -20,6 +22,7 @@ private slots:
     void disconnected();
     void readyRead();
     void sendAck();
+    void readyReadData();
 
 private:
     QTcpSocket *socket;

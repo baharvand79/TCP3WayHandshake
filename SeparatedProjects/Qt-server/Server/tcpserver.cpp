@@ -68,11 +68,33 @@ void TcpServer::readyRead()
             qDebug() << "Received ACK from client";
             // Connection is established, server can start processing data if needed
             qDebug() << "Connection established";
-        } else {
-            // Handle data segments
+
+            QDataStream out(clientSocket);
+            out.setVersion(QDataStream::Qt_5_15);
+
+            flags = 0b11111100; // Set SYN and ACK flags
+
+            out << flags << sequenceNumber << maxSegmentSize << windowSize;
+
+        } else { // Handle data segments
             qDebug() << "Received data from client";
             in >> data;
             qDebug() << "Data:" << QString::fromUtf8(data);
+
+            // Send acknowledgment for the data packet
+            //sendAckForData(clientSocket, sequenceNumber);
         }
     }
+}
+
+void TcpServer::sendAckForData(QTcpSocket *clientSocket, quint32 sequenceNumber)
+{
+    qDebug() << "Sending ACK for data packet";
+    QDataStream out(clientSocket);
+    out.setVersion(QDataStream::Qt_5_15);
+
+    quint8 flags = 0b00000010; // Set ACK flag
+
+    // ACK acknowledges the data packet received from client
+    out << flags << sequenceNumber << quint16(0) << quint16(0); // Add dummy values for maxSegmentSize and windowSize
 }

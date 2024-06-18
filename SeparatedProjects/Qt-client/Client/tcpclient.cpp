@@ -38,7 +38,6 @@ void TcpClient::sendSyn()
 void TcpClient::connected()
 {
     qDebug() << "Connected to server";
-
     sendSyn(); // Send SYN message upon connection
 }
 
@@ -70,12 +69,16 @@ void TcpClient::readyRead()
         } else if (flags & 0b00000010) { // Check if ACK flag is set
             qDebug() << "Received ACK from server";
             // Now connection is established and we can send data
-            sendData("Hello from client!");
-        } else {
-            // Handle data segments
-            qDebug() << "Received data from server";
-            in >> data;
-            qDebug() << "Data:" << QString::fromUtf8(data);
+
+        } else { // Handle data segments
+            // qDebug() << "Received data from server";
+            // in >> data;
+            // qDebug() << "Data:" << QString::fromUtf8(data);
+
+            qDebug() << "Sending Data\n";
+            sendData("Hello from client!"); // Example message
+            // If data is received, send an acknowledgment
+            //sendAckForData(sequenceNumber);
         }
     }
 }
@@ -90,19 +93,42 @@ void TcpClient::sendAck()
 
     // ACK acknowledges the SYN-ACK received from server
     out << flags << (serverSequenceNumber + 1) << quint16(0) << quint16(0); // Add dummy values for maxSegmentSize and windowSize
-
-    // Now that ACK is sent, connection should be considered established
-    // Example: After ACK, client can start sending data
-    sendData("Hello from client!");
 }
+
+// void TcpClient::sendAckForData(quint32 sequenceNumber)
+// {
+//     qDebug() << "Sending ACK for data packet";
+//     QDataStream out(socket);
+//     out.setVersion(QDataStream::Qt_5_15);
+
+//     quint8 flags = 0b00000010; // Set ACK flag
+
+//     // ACK acknowledges the data packet received from server
+//     out << flags << sequenceNumber << quint16(0) << quint16(0); // Add dummy values for maxSegmentSize and windowSize
+// }
 
 void TcpClient::sendData(const QString &message)
 {
-    qDebug() << "Sending data to server:" << message;
+    int maxSegmentSize = 100; // Example segment size
+    QByteArray data = message.toUtf8();
+    int totalSegments = (data.size() + maxSegmentSize - 1) / maxSegmentSize;
+
+    for (int i = 0; i < totalSegments; ++i) {
+        int segmentSize = qMin(maxSegmentSize, data.size() - i * maxSegmentSize);
+        QByteArray segment = data.mid(i * maxSegmentSize, segmentSize);
+
+        qDebug() << "Sending data segment" << i + 1 << "/" << totalSegments << ":" << QString::fromUtf8(segment);
+        sendSegment(segment);
+    }
+}
+
+void TcpClient::sendSegment(const QByteArray &segment)
+{
     QDataStream out(socket);
     out.setVersion(QDataStream::Qt_5_15);
 
-    quint8 flags = 0; // No special flags for data segment
+    quint8 flags = 0b11111100; // Use a specific flag to denote data segments
+    out << flags << clientSequenceNumber << quint16(0) << quint16(0) << segment;
 
-    out << flags << clientSequenceNumber << quint16(0) << quint16(0) << message.toUtf8();
+    clientSequenceNumber++; // Increment client sequence number after sending each segment
 }
