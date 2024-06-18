@@ -23,6 +23,7 @@ public slots:
     void sendSegment(const QByteArray &segment);
     void sendPeriodicMessages();
 
+
 private:
     QTcpSocket *socket;
     quint32 clientSequenceNumber;
