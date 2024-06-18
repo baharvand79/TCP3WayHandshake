@@ -5,8 +5,9 @@
 #include <QTcpSocket>
 #include <QThread>
 #include <QMap>
-#include "packet.h"
 #include <QCryptographicHash>
+#include "packet.h"
+
 class ClientHandler : public QObject
 {
     Q_OBJECT
@@ -14,18 +15,19 @@ public:
     explicit ClientHandler(qintptr socketDescriptor, QObject *parent = nullptr);
     ~ClientHandler();
 
-public slots:
-    void readyRead();
-    void disconnected();
-
 signals:
     void error(QTcpSocket::SocketError socketError);
     void finished();
+
+public slots:
+    void readyRead();
+    void disconnected();
 
 private:
     QTcpSocket *clientSocket;
     quint32 clientSequenceNumber;
     quint32 serverSequenceNumber;
+    QString clientIdentifier;
     QMap<QTcpSocket*, quint32> clientSequenceNumbers;
     QMap<QTcpSocket*, quint32> serverSequenceNumbers;
 
@@ -45,7 +47,6 @@ public:
 
 protected:
     void incomingConnection(qintptr socketDescriptor) override;
-
 };
 
 #endif // TCPSERVER_H
